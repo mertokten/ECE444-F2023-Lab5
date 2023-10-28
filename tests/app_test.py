@@ -4,6 +4,9 @@ import json
 
 from project.app import app, db
 
+# from project.models import Post
+import project.models
+
 TEST_DB = "test.db"
 
 
@@ -85,3 +88,21 @@ def test_messages(client):
     assert b"No entries here so far" not in rv.data
     assert b"&lt;Hello&gt;" in rv.data
     assert b"<strong>HTML</strong> allowed here" in rv.data
+
+
+def test_search_route(client):
+    message1 = project.models.Post(title="one", text="two")
+    message2 = project.models.Post(title="three", text="four")
+    db.session.add(message1)
+    db.session.add(message2)
+    db.session.commit()
+
+    rv1 = client.get("/search/")
+    assert rv1.status_code == 200
+    assert b"one" not in rv1.data
+    assert b"three" not in rv1.data
+
+    rv2 = client.get("/search/?query=one")
+    assert rv2.status_code == 200
+    assert b"one" in rv2.data
+    assert b"three" not in rv2.data
