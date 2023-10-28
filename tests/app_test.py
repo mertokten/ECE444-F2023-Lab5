@@ -1,8 +1,8 @@
-import os
 import pytest
 from pathlib import Path
+import json
 
-from project.app import app, init_db
+from project.app import app, db
 
 TEST_DB = "test.db"
 
@@ -12,10 +12,12 @@ def client():
     BASE_DIR = Path(__file__).resolve().parent.parent
     app.config["TESTING"] = True
     app.config["DATABASE"] = BASE_DIR.joinpath(TEST_DB)
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{BASE_DIR.joinpath(TEST_DB)}"
 
-    init_db() # setup
-    yield app.test_client() # tests run here
-    init_db() # teardown
+    with app.app_context():
+        db.create_all()  # setup
+        yield app.test_client()  # tests run here
+        db.drop_all()  # teardown
 
 
 def login(client, username, password):
@@ -59,6 +61,17 @@ def test_login_logout(client):
     assert b"Invalid username" in rv.data
     rv = login(client, app.config["USERNAME"], app.config["PASSWORD"] + "x")
     assert b"Invalid password" in rv.data
+
+
+def test_delete_message(client):
+    """Ensure the messages are being deleted"""
+    rv = client.get("/delete/1")
+    data = json.loads(rv.data)
+    assert data["status"] == 0
+    login(client, app.config["USERNAME"], app.config["PASSWORD"])
+    rv = client.get("/delete/1")
+    data = json.loads(rv.data)
+    assert data["status"] == 1
 
 
 def test_messages(client):
